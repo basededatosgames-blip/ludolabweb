@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ludolab | Quantum Reality v14.7</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100;300;400;700;900&family=Syne:wght@400;700;800&display=swap');
+
+        :root {
+            --cod-gray: #1e1e1e;
+            --white: #ffffff;
+            --border: rgba(255, 255, 255, 0.08);
+        }
+
+        /* Configuración de scroll y visualización */
+        html { scroll-restoration: manual; scroll-behavior: auto !important; }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
+        @media (pointer: fine) {
+            * { cursor: none !important; }
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--cod-gray);
+            color: var(--white);
+            overflow-x: hidden;
+            scrollbar-width: none;
+            width: 100%;
+        }
+        body::-webkit-scrollbar { display: none; }
+
+        /* --- EFECTOS DE SUPERPOSICIÓN --- */
+        .scanlines {
+            position: fixed; inset: 0; z-index: 99998;
+            background: linear-gradient(to bottom, transparent 50%, rgba(0,0,0,0.05) 51%);
+            background-size: 100% 4px; pointer-events: none; opacity: 0.1;
+        }
+        .grain {
+            position: fixed; inset: 0; z-index: 99999;
+            background-image: url('https://grainy-gradients.vercel.app/noise.svg');
+            opacity: 0.03; pointer-events: none;
+        }
+
+        /* --- TÍTULO LUDOTECA RESPONSIVO --- */
+        .hero-title-wrap {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 10px 0;
+            margin-top: 15px;
+        }
+        .ludoteca-title {
+            font-family: 'Syne', sans-serif;
+            font-weight: 800;
+            color: #ffffff;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            /* Escalado agresivo y flexible */
+            font-size: clamp(3.5rem, 18vw, 11rem); 
+            line-height: 0.8;
+            text-align: center;
+            display: block;
+            max-width: 95vw;
+            word-wrap: break-word; /* Permite que la palabra se divida si es necesario */
+            filter: drop-shadow(0 0 20px rgba(255,255,255,0.1));
+            overflow-wrap: break-word;
+        }
+        .char-sync {
+            display: inline-block;
+            opacity: 0;
+            filter: blur(10px);
+            transform: translateY(15px);
+            will-change: transform, opacity, filter;
+        }
+
+        /* --- NUEVO EFECTO: QUANTUM FREQUENCY SCANNER --- */
+        .scanner-container {
+            margin-top: 2rem;
+            width: clamp(260px, 85vw, 500px);
+            height: 70px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        #scanner-canvas {
+            width: 100%;
+            height: 100%;
+        }
+        .scanner-hud {
+            position: absolute;
+            bottom: -5px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 10px;
+            font-family: monospace;
+            font-size: 6px;
+            color: rgba(255,255,255,0.2);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            pointer-events: none;
+        }
+
+        /* --- MONITOR DE ACTIVIDAD CUÁNTICA --- */
+        .quantum-pulse-wave {
+            margin-top: 2rem;
+            width: clamp(280px, 95vw, 600px);
+            height: 30px;
+            background: rgba(0,0,0,0.2);
+            border: 1px solid rgba(255,255,255,0.03);
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            border-radius: 4px;
+        }
+        .wave-svg { width: 100%; height: 100%; stroke: rgba(255,255,255,0.2); stroke-width: 1; fill: none; }
+        .wave-path { animation: wave-move 3s linear infinite; }
+        @keyframes wave-move { 0% { transform: translateX(0); } 100% { transform: translateX(-50px); } }
+
+        /* --- CURSOR --- */
+        #cursor-lead {
+            position: fixed; top: 0; left: 0; width: 8px; height: 8px;
+            background: #fff; border-radius: 50%; pointer-events: none; z-index: 1000001;
+            mix-blend-mode: difference; will-change: transform;
+        }
+        .cursor-trail {
+            position: fixed; top: 0; left: 0; width: 30px; height: 30px;
+            border: 1px solid rgba(255,255,255,0.3); border-radius: 50%;
+            pointer-events: none; z-index: 1000000; mix-blend-mode: difference;
+            will-change: transform;
+        }
+
+        /* --- LOADER --- */
+        #loader-wrapper {
+            position: fixed; inset: 0; z-index: 100000;
+            background: #111; display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+        }
+        #loader-canvas { width: min(320px, 80vw); height: min(320px, 80vw); }
+
+        /* --- MARCA DE AGUA (AJUSTADA) --- */
+        .brand-header {
+            position: relative; 
+            padding-top: 5vh; 
+            z-index: 100;
+            display: flex; 
+            justify-content: center; 
+            width: 100%;
+        }
+        .logo-container { position: relative; display: inline-block; transition: transform 0.4s; }
+        .logo-img {
+            width: clamp(130px, 18vw, 260px); 
+            mix-blend-mode: lighten; 
+            filter: contrast(1.1) brightness(1.1);
+            animation: periodic-glow 4s infinite ease-in-out;
+        }
+        @keyframes periodic-glow {
+            0%, 40%, 100% { filter: contrast(1.1) brightness(1.1) drop-shadow(0 0 0px white); }
+            70% { filter: contrast(1.2) brightness(1.6) drop-shadow(0 0 15px rgba(255,255,255,0.4)); }
+        }
+        .logo-container:hover .logo-img { animation: logo-glitch 0.3s infinite linear; transform: scale(0.98); }
+
+        /* --- MÉTRICAS --- */
+        .metric-card {
+            border-left: 1px solid rgba(255,255,255,0.05); padding: 2.5rem 1.5rem; transition: 0.5s;
+        }
+        .metric-card:hover { background: rgba(255,255,255,0.02); border-left-color: #fff; }
+
+        /* --- SIMULADOR --- */
+        #game-viewport {
+            width: 100%; height: clamp(450px, 70vh, 800px);
+            background: #0a0a0a; border: 1px solid rgba(255,255,255,0.1);
+            position: relative; overflow: hidden; border-radius: 20px;
+            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+            margin: 0 auto;
+        }
+        .game-grid {
+            position: absolute; inset: 0;
+            background-image: radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px);
+            background-size: 30px 30px; opacity: 0.5; pointer-events: none;
+        }
+        #game-overlay {
+            position: absolute; inset: 0; z-index: 50;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            background: rgba(15,15,15,0.92); text-align: center; padding: 2rem;
+            backdrop-filter: blur(12px);
+        }
+        .game-node {
+            position: absolute; width: clamp(50px, 9vw, 65px); height: clamp(50px, 9vw, 65px);
+            background: #fff; display: flex; align-items: center; justify-content: center;
+            clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+            color: #000; font-weight: 900; z-index: 30; cursor: pointer;
+        }
+
+        /* --- DISEÑO BASE --- */
+        #bg-canvas { position: fixed; inset: 0; z-index: -1; pointer-events: none; }
+        .section-container { width: 100%; max-width: 1400px; margin: 0 auto; padding: 0 1.5rem; }
+        #scroll-progress { position: fixed; top: 0; left: 0; height: 3px; background: #fff; z-index: 200001; }
+        
+        #full-menu {
+            position: fixed; inset: 0; background: rgba(20,20,20,0.98);
+            backdrop-filter: blur(30px); z-index: 100006;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            opacity: 0; pointer-events: none; transition: 0.6s cubic-bezier(0.19, 1, 0.22, 1);
+        }
+        #full-menu.active { opacity: 1; pointer-events: auto; }
+        .menu-link {
+            font-size: clamp(2rem, 8vw, 4.5rem); font-weight: 900; color: white;
+            text-transform: uppercase; margin: 8px 0; text-decoration: none;
+        }
+
+        #nav-trigger {
+            position: fixed; top: 20px; left: 20px; z-index: 100005;
+            width: 35px; height: 35px; display: flex; flex-direction: column;
+            justify-content: center; gap: 5px; mix-blend-mode: difference;
+        }
+        .nav-line { width: 100%; height: 2px; background: white; transition: 0.4s; }
+
+        .huge-90 {
+            font-size: clamp(6rem, 25vw, 28rem); font-weight: 900; line-height: 0.8;
+            background: linear-gradient(180deg, #fff 40%, #555 100%);
+            -webkit-background-clip: text; background-clip: text; color: transparent;
+        }
+
+        .bottom-ghost-text {
+            font-size: 15vw; font-weight: 900; color: white; opacity: 0.02;
+            white-space: nowrap; pointer-events: none; filter: blur(3px);
+            animation: text-float 25s linear infinite;
+        }
+        @keyframes text-float {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="grain"></div>
+    <div class="scanlines"></div>
+    <div id="explosion-flash" class="fixed inset-0 bg-white z-[100002] opacity-0 pointer-events-none"></div>
+
+    <!-- PRECARGA -->
+    <div id="loader-wrapper">
+        <div id="loader-canvas"></div>
+        <div id="loader-pct" class="text-7xl font-black syne italic">00%</div>
+        <div class="mt-4 text-[9px] tracking-[2.5em] text-white/20 uppercase text-center">QUANTUM CORE CARGANDO ...</div>
+    </div>
+
+    <!-- UI -->
+    <div id="nav-trigger" class="cursor-pointer" onclick="toggleMenu()">
+        <div class="nav-line"></div><div class="nav-line"></div><div class="nav-line"></div>
+    </div>
+    <div id="full-menu">
+        <button id="menu-close" onclick="toggleMenu()" class="absolute top-10 right-10 text-4xl text-white"><i class="fas fa-times"></i></button>
+        <a href="#hero-section" class="menu-link" onclick="toggleMenu()">INICIO</a>
+        <a href="#protocol" class="menu-link" onclick="toggleMenu()">SISTEMA</a>
+        <a href="#ninety" class="menu-link" onclick="toggleMenu()">METRICAS</a>
+        <a href="#lab" class="menu-link" onclick="toggleMenu()">SIMULADOR</a>
+        <a href="#faq" class="menu-link" onclick="toggleMenu()">INFO CENTER</a>
+        <a href="mailto:hola@ludolab.ai" class="menu-link">CONTACTO</a>
+    </div>
+
+    <div id="scroll-progress"></div>
+    <div id="cursor-lead"></div>
+    <div class="cursor-trail" id="t1"></div>
+    <div class="cursor-trail" id="t2"></div>
+    
+    <canvas id="bg-canvas"></canvas>
+
+    <main id="main-content" class="opacity-0 w-full transition-opacity duration-1000">
+        
+        <!-- HEADER (MARCA DE AGUA) -->
+        <header class="brand-header">
+            <div class="logo-container" id="magnetic-logo">
+                <img src="https://images4.imagebam.com/28/e8/03/ME19P0B9_o.png" alt="Ludolab" class="logo-img">
+            </div>
+        </header>
+
+        <!-- HERO SECTION -->
+        <section id="hero-section" class="min-h-[100vh] flex flex-col justify-start items-center px-6 pt-[2vh] text-center relative overflow-hidden">
+            <div class="z-10 w-full max-w-7xl flex flex-col items-center">
+                
+                <div class="hero-title-wrap">
+                    <!-- Título optimizado para división responsiva -->
+                    <h1 id="main-title" class="ludoteca-title">LUDOTECA</h1>
+                </div>
+
+                <div class="mt-4 flex flex-col items-center gap-3 md:gap-5">
+                    <div id="hero-subtitle" class="text-xl md:text-3xl font-black uppercase syne tracking-[0.2em] text-white/90">La ludoteca es...</div>
+                    <p id="hero-desc" class="text-xs md:text-lg font-light text-white/40 italic max-w-4xl mx-auto leading-relaxed px-4">
+                        un ecosistema de alto impacto diseñado para forjar mentes empresariales y ciber-resilientes mediante IA avanzada.
+                    </p>
+                    <div class="pt-6 flex flex-col items-center">
+                        <button class="px-10 py-5 bg-white text-black font-black uppercase tracking-[0.4em] text-[9px] md:text-[11px] hover:scale-110 transition-transform shadow-[0_0_20px_rgba(255,255,255,0.1)]" onclick="scrollToSection('protocol')">INICIAR FLUJO</button>
+                        
+                        <!-- EFECTO: QUANTUM FREQUENCY SCANNER -->
+                        <div class="scanner-container">
+                            <canvas id="scanner-canvas"></canvas>
+                            <div class="scanner-hud">
+                                <span>Core_Status: Optimizing</span>
+                                <span>Freq: 432Hz</span>
+                            </div>
+                        </div>
+
+                        <!-- MONITOR DE ACTIVIDAD CUÁNTICA -->
+                        <div class="quantum-pulse-wave">
+                            <svg class="wave-svg" viewBox="0 0 100 40">
+                                <path class="wave-path" d="M0,20 Q5,5 10,20 T20,20 T30,20 T40,20 T50,20 T60,20 T70,20 T80,20 T90,20 T100,20 T110,20 T120,20 T130,20 T140,20 T150,20" />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- MÉTRICAS -->
+        <section class="py-24 border-y border-white/5 bg-white/[0.01]">
+            <div class="section-container grid grid-cols-2 md:grid-cols-4 gap-0">
+                <div class="metric-card scroll-reveal">
+                    <span class="text-[8px] tracking-[0.8em] text-white/30 uppercase mb-3 block">Retención</span>
+                    <h4 class="text-5xl md:text-7xl font-black syne counter-val" data-target="90">0</h4>
+                    <p class="text-[9px] uppercase text-white/20 mt-3">Aprendizaje Activo</p>
+                </div>
+                <div class="metric-card scroll-reveal">
+                    <span class="text-[8px] tracking-[0.8em] text-white/30 uppercase mb-4 block">Latencia</span>
+                    <h4 class="text-5xl md:text-7xl font-black syne counter-val" data-target="0">0</h4>
+                    <p class="text-[10px] uppercase text-white/20 mt-4">ms Neural Sync</p>
+                </div>
+                <div class="metric-card scroll-reveal">
+                    <span class="text-[8px] tracking-[0.8em] text-white/30 uppercase mb-4 block">Estatus</span>
+                    <h4 class="text-5xl md:text-8xl font-black syne">MAX</h4>
+                    <p class="text-[10px] uppercase text-white/20 mt-4">Quantum Rank</p>
+                </div>
+                <div class="metric-card scroll-reveal">
+                    <span class="text-[8px] tracking-[0.8em] text-white/30 uppercase mb-4 block">Impacto</span>
+                    <h4 class="text-5xl md:text-8xl font-black syne counter-val" data-target="100">0</h4>
+                    <p class="text-[10px] uppercase text-white/20 mt-4">% Eficiencia IA</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 90% SECTION -->
+        <section id="ninety" class="py-48 text-center overflow-hidden">
+            <div class="section-container flex flex-col items-center">
+                <h2 class="huge-90 syne scroll-reveal">90%</h2>
+                <p class="text-xl md:text-5xl font-light text-white/50 mt-12 max-w-5xl mx-auto leading-tight scroll-reveal">
+                    Basados en la pirámide de <span class="text-white italic font-bold">Edgar Dale</span>, transformamos la teoría en memoria muscular mediante simulación estratégica.
+                </p>
+            </div>
+        </section>
+
+        <!-- SIMULADOR -->
+        <section id="lab" class="py-24 px-6 bg-[#181818]">
+            <div class="section-container text-center md:text-left relative">
+                <h2 class="text-4xl md:text-[6.5rem] font-black syne uppercase italic mb-10">Core <span class="text-white/10">X</span></h2>
+                <div id="game-viewport" class="relative">
+                    <div class="game-grid"></div>
+                    <div id="game-overlay">
+                        <h3 class="text-2xl md:text-5xl font-black mb-10 tracking-[0.5em] uppercase syne text-white">READY CORE?</h3>
+                        <button class="px-16 py-8 border-2 border-white text-white font-black text-xs tracking-[1em] hover:bg-white hover:text-black transition-all rounded-sm" onclick="startGame()">DESPLEGAR</button>
+                    </div>
+                    
+                    <div id="game-hud" class="absolute top-10 left-10 right-10 z-40 flex justify-between items-center opacity-0 pointer-events-none">
+                        <div class="text-[10px] font-black tracking-[0.5em] text-white">SYNC: <span id="score">0</span> / 15</div>
+                        <div class="text-[10px] font-black tracking-[0.5em] text-white" id="timer">CLOCK: 00s</div>
+                    </div>
+
+                    <div id="game-canvas-area" class="w-full h-full relative cursor-crosshair"></div>
+
+                    <div id="game-win-screen" class="absolute inset-0 z-[100] hidden flex-col items-center justify-center bg-white text-black text-center p-6">
+                        <h4 class="text-3xl md:text-7xl font-black syne italic leading-none mb-10 underline">CORE ESTABILIZADO</h4>
+                        <button class="px-10 py-5 border-4 border-black font-black uppercase text-[10px] hover:bg-black hover:text-white transition-all" onclick="startGame()">REINICIAR_SYNC</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- INFO CENTER -->
+        <section id="faq" class="py-24">
+            <div class="section-container max-w-5xl">
+                <h3 class="text-3xl md:text-6xl font-black uppercase syne italic mb-12 text-center text-white">Info Center</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div class="metric-card scroll-reveal cursor-pointer group hover:bg-white/5" onclick="openPopupGlobal('Misión Ludolab', 'Ecosistema diseñado para cerrar la brecha entre la formación tradicional y el mercado digital.')">
+                        <div class="flex justify-between items-center"><span class="text-xl font-black uppercase tracking-widest text-white">¿Cuál es el fin?</span><i class="fas fa-plus text-white/30"></i></div>
+                    </div>
+                    <div class="metric-card scroll-reveal cursor-pointer group hover:bg-white/5" onclick="openPopupGlobal('Metodología Quantum', 'Arquitectura basada en aprendizaje activo y simulación estratégica.')">
+                        <div class="flex justify-between items-center"><span class="text-xl font-black uppercase tracking-widest text-white">Metodología</span><i class="fas fa-plus text-white/30"></i></div>
+                    </div>
+                    <div class="metric-card scroll-reveal cursor-pointer group hover:bg-white/5" onclick="openPopupGlobal('Seguridad Neural', 'Protocolos de encriptación y protección de activos estratégicos.')">
+                        <div class="flex justify-between items-center"><span class="text-xl font-black uppercase tracking-widest text-white">Seguridad</span><i class="fas fa-plus text-white/30"></i></div>
+                    </div>
+                    <div class="metric-card scroll-reveal cursor-pointer group hover:bg-white/5" onclick="openPopupGlobal('Escalabilidad IA', 'Agentes autónomos para optimización de flujos empresariales.')">
+                        <div class="flex justify-between items-center"><span class="text-xl font-black uppercase tracking-widest text-white">Escalabilidad</span><i class="fas fa-plus text-white/30"></i></div>
+                    </div>
+                    <div class="metric-card scroll-reveal cursor-pointer group hover:bg-white/5" onclick="openPopupGlobal('Comunidad Global', 'Red de fundadores conectados mediante realidades gamificadas.')">
+                        <div class="flex justify-between items-center"><span class="text-xl font-black uppercase tracking-widest text-white">Comunidad</span><i class="fas fa-plus text-white/30"></i></div>
+                    </div>
+                    <div class="metric-card scroll-reveal cursor-pointer group hover:bg-white/5" onclick="openPopupGlobal('Futuro Quantum', 'Nuevas interfaces inmersivas para toma de decisiones sin latencia.')">
+                        <div class="flex justify-between items-center"><span class="text-xl font-black uppercase tracking-widest text-white">Futuro</span><i class="fas fa-plus text-white/30"></i></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- FINAL -->
+        <section class="py-48 bg-white text-black text-center relative overflow-hidden">
+            <h2 class="text-8xl md:text-[15rem] syne font-black uppercase italic leading-none hover:scale-95 transition-transform">START</h2>
+            <div class="mt-12">
+                <a href="mailto:hola@ludolab.ai" class="inline-block px-12 py-6 bg-black text-white font-black uppercase tracking-[0.8em] text-[10px] hover:scale-105 transition-transform">INIT STARTUP</a>
+            </div>
+            <div class="section-container mt-16">
+                <div class="bottom-ghost-text syne">LUDOTECA DIGITAL QUANTUM REALITY LUDOTECA DIGITAL</div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="py-16 border-t border-white/5 bg-[#1e1e1e] px-6 text-center">
+        <p class="text-[8px] tracking-[2.5em] text-white/10 font-black uppercase">Ludolab v14.7 Quantum Reality</p>
+    </footer>
+
+    <!-- POPUP GLOBAL -->
+    <div id="popup-overlay-global" class="fixed inset-0 bg-black/95 backdrop-blur-2xl z-[200000] flex flex-col items-center justify-center opacity-0 pointer-events-none transition-opacity duration-500 p-8">
+        <button onclick="closePopup()" class="absolute top-10 right-10 text-4xl text-white"><i class="fas fa-times"></i></button>
+        <div class="max-w-4xl text-center px-4">
+            <h2 id="popup-title-global" class="text-3xl md:text-6xl font-black syne uppercase mb-6 text-white"></h2>
+            <p id="popup-text-global" class="text-lg md:text-2xl font-light text-white/60 italic leading-relaxed"></p>
+        </div>
+    </div>
+
+    <script>
+        if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; }
+        window.scrollTo(0, 0);
+
+        function scrollToSection(id) { 
+            const el = document.getElementById(id);
+            if(el) el.scrollIntoView({behavior:'smooth'});
+        }
+        function toggleMenu() { document.getElementById('full-menu').classList.toggle('active'); }
+        function openPopupGlobal(title, text) {
+            document.getElementById('popup-title-global').innerText = title;
+            document.getElementById('popup-text-global').innerText = text;
+            document.getElementById('popup-overlay-global').style.opacity = '1';
+            document.getElementById('popup-overlay-global').style.pointerEvents = 'auto';
+        }
+        function closePopup() { 
+            document.getElementById('popup-overlay-global').style.opacity = '0';
+            document.getElementById('popup-overlay-global').style.pointerEvents = 'none';
+        }
+
+        // --- CURSOR ---
+        const lead = document.getElementById('cursor-lead');
+        const trails = [document.getElementById('t1'), document.getElementById('t2')];
+        let mX = -100, mY = -100, tX = [-100, -100], tY = [-100, -100];
+
+        window.addEventListener('mousemove', (e) => {
+            mX = e.clientX; mY = e.clientY;
+            lead.style.transform = `translate3d(${mX}px, ${mY}px, 0) translate(-50%, -50%)`;
+            
+            const magLogo = document.getElementById('magnetic-logo');
+            if (magLogo) {
+                const rect = magLogo.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                const dx = (mX - centerX) * 0.12;
+                const dy = (mY - centerY) * 0.12;
+                const dist = Math.hypot(mX - centerX, mY - centerY);
+                if (dist < 250) {
+                    magLogo.style.transform = `perspective(1000px) rotateX(${-dy}deg) rotateY(${dx}deg) translate(${dx}px, ${dy}px)`;
+                } else {
+                    magLogo.style.transform = `perspective(1000px) rotateX(0) rotateY(0) translate(0, 0)`;
+                }
+            }
+        });
+
+        // --- SCANNER ENGINE ---
+        const scanCanvas = document.getElementById('scanner-canvas');
+        const scanCtx = scanCanvas.getContext('2d');
+        let scanTime = 0;
+
+        function initScanner() {
+            scanCanvas.width = scanCanvas.offsetWidth;
+            scanCanvas.height = scanCanvas.offsetHeight;
+        }
+
+        function drawScanner() {
+            scanCtx.clearRect(0, 0, scanCanvas.width, scanCanvas.height);
+            scanTime += 0.015;
+            const rect = scanCanvas.getBoundingClientRect();
+            const relX = mX - rect.left;
+            const midY = scanCanvas.height / 2;
+            const scanLineY = midY + Math.sin(scanTime * 2) * 15;
+            
+            const gradient = scanCtx.createLinearGradient(0, scanLineY - 10, 0, scanLineY + 10);
+            gradient.addColorStop(0, 'rgba(255,255,255,0)');
+            gradient.addColorStop(0.5, 'rgba(255,255,255,0.3)');
+            gradient.addColorStop(1, 'rgba(255,255,255,0)');
+            scanCtx.fillStyle = gradient;
+            scanCtx.fillRect(0, scanLineY - 10, scanCanvas.width, 20);
+
+            for(let i = 0; i < scanCanvas.width; i += 12) {
+                const influence = Math.exp(-Math.pow((i - relX) / 50, 2));
+                const barH = 5 + (influence * 35) + Math.random()*5;
+                scanCtx.fillStyle = `rgba(255,255,255,${0.1 + influence*0.4})`;
+                scanCtx.fillRect(i, midY - barH/2, 1, barH);
+            }
+            requestAnimationFrame(drawScanner);
+        }
+
+        const loopCursor = () => {
+            const speed = [0.22, 0.14];
+            trails.forEach((t, i) => {
+                tX[i] += (mX - tX[i]) * speed[i];
+                tY[i] += (mY - tY[i]) * speed[i];
+                t.style.transform = `translate3d(${tX[i]}px, ${tY[i]}px, 0) translate(-50%, -50%) scale(${1 - i*0.2})`;
+            });
+            requestAnimationFrame(loopCursor);
+        };
+        loopCursor();
+
+        // --- PRELOADER ---
+        const initLoader = () => {
+            window.scrollTo(0, 0);
+            const container = document.getElementById('loader-canvas');
+            const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+            renderer.setSize(container.clientWidth, container.clientWidth);
+            container.appendChild(renderer.domElement);
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000); camera.position.z = 4;
+            const prism = new THREE.Mesh(new THREE.IcosahedronGeometry(2, 0), new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true }));
+            scene.add(prism);
+
+            let p = 0; const start = Date.now(); const dur = 7000;
+            const update = () => {
+                const elapsed = Date.now() - start;
+                p = Math.min((elapsed / dur) * 100, 100);
+                document.getElementById('loader-pct').innerText = Math.floor(p).toString().padStart(2, '0') + '%';
+                prism.rotation.y += 0.05; prism.scale.setScalar(1 + (p/100)); renderer.render(scene, camera);
+                if(p < 100) requestAnimationFrame(update);
+                else {
+                    gsap.to('#explosion-flash', { opacity: 1, duration: 0.1, onComplete: () => {
+                        document.getElementById('loader-wrapper').remove();
+                        document.getElementById('main-content').style.opacity = '1';
+                        initThree(); initAnimations(); initScanner(); drawScanner();
+                        gsap.to('#explosion-flash', { opacity: 0, duration: 2 });
+                        window.scrollTo(0, 0);
+                    }});
+                }
+            };
+            update();
+        };
+
+        // --- BACKGROUND THREE.JS ---
+        let sceneB, cameraB, rendererB, terrainB, prismsB = [], particlesB;
+        const initThree = () => {
+            rendererB = new THREE.WebGLRenderer({ canvas: document.getElementById('bg-canvas'), alpha:true, antialias:true });
+            rendererB.setSize(window.innerWidth, window.innerHeight);
+            rendererB.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+            sceneB = new THREE.Scene();
+            cameraB = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+            cameraB.position.z = 18;
+
+            const terrainGeo = new THREE.PlaneGeometry(160, 160, 64, 64);
+            const terrainMat = new THREE.MeshBasicMaterial({color:0xffffff, wireframe:true, transparent:true, opacity:0.08});
+            terrainB = new THREE.Mesh(terrainGeo, terrainMat);
+            terrainB.rotation.x = -Math.PI/2.5;
+            sceneB.add(terrainB);
+
+            const pCount = 35000;
+            const pGeo = new THREE.BufferGeometry();
+            const pPos = new Float32Array(pCount * 3);
+            for(let i=0; i<pCount*3; i++) pPos[i] = (Math.random()-0.5)*250;
+            pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+            particlesB = new THREE.Points(pGeo, new THREE.PointsMaterial({color:0xffffff, size:0.03, transparent:true, opacity:0.4}));
+            sceneB.add(particlesB);
+
+            for(let i=0; i<15; i++){
+                const m = new THREE.Mesh(new THREE.IcosahedronGeometry(1.8, 0), new THREE.MeshBasicMaterial({color:0xffffff, wireframe:true, transparent:true, opacity:0.06}));
+                m.position.set((Math.random()-0.5)*80,(Math.random()-0.5)*60,(Math.random()-0.5)*40);
+                sceneB.add(m); prismsB.push(m);
+            }
+
+            let clock = 0;
+            const animate = () => {
+                requestAnimationFrame(animate); 
+                clock += 0.015;
+                const v = terrainB.geometry.attributes.position.array;
+                for(let i=0; i<v.length; i+=3) v[i+2] = Math.sin(v[i]*0.1 + clock)*2.5 + Math.cos(v[i+1]*0.1 + clock)*2.5;
+                terrainB.geometry.attributes.position.needsUpdate = true;
+                terrainB.rotation.z += 0.001; particlesB.rotation.y += 0.0003; particlesB.rotation.x += 0.0001;
+                prismsB.forEach((p, idx) => { p.rotation.x += 0.008; p.rotation.y += 0.01; p.position.y += Math.sin(clock + idx)*0.015; });
+                rendererB.render(sceneB, cameraB);
+            };
+            animate();
+            window.addEventListener('resize', () => {
+                cameraB.aspect = window.innerWidth/window.innerHeight; cameraB.updateProjectionMatrix();
+                rendererB.setSize(window.innerWidth, window.innerHeight);
+                initScanner();
+            });
+        };
+
+        const initAnimations = () => {
+            gsap.registerPlugin(ScrollTrigger);
+            const title = document.getElementById('main-title');
+            const chars = title.innerText.split("");
+            title.innerHTML = chars.map(c => `<span class="char-sync">${c === " " ? "&nbsp;" : c}</span>`).join("");
+            
+            gsap.to(".char-sync", {
+                opacity: 1, y: 0, filter: "blur(0px)", duration: 1.2,
+                stagger: { each: 0.1, from: "center" }, ease: "power4.out"
+            });
+
+            gsap.utils.toArray(".scroll-reveal").forEach(el => {
+                gsap.from(el, { opacity: 0, y: 40, duration: 1.2, scrollTrigger: { trigger: el, start: "top 90%" } });
+            });
+
+            gsap.utils.toArray(".counter-val").forEach(c => {
+                ScrollTrigger.create({ trigger: c, start: "top 90%", onEnter: () => {
+                    let o = { v: 0 }; gsap.to(o, { v: c.dataset.target, duration: 2.5, onUpdate: () => c.innerText = Math.floor(o.v) });
+                }});
+            });
+        };
+
+        // --- SISTEMA DE JUEGO ---
+        let gameScore=0, gameActive=false, gameInt;
+        function startGame() {
+            document.getElementById('game-overlay').style.display='none';
+            document.getElementById('game-win-screen').style.display='none';
+            document.getElementById('game-hud').style.opacity='1';
+            const area = document.getElementById('game-canvas-area'); area.innerHTML='';
+            gameScore=0; gameActive=true; spawnNode();
+            document.getElementById('score').innerText = '0';
+            let time=0; if(gameInt) clearInterval(gameInt);
+            gameInt = setInterval(() => { time++; document.getElementById('timer').innerText=`CLOCK: ${time.toString().padStart(2, '0')}s`; }, 1000);
+        }
+        function spawnNode() {
+            if(!gameActive) return;
+            if(gameScore >= 15) { gameWin(); return; }
+            const n = document.createElement('div'); n.className='game-node'; n.innerHTML='<i class="fas fa-atom"></i>';
+            const area = document.getElementById('game-canvas-area');
+            const safePadding = 15; 
+            n.style.left = (Math.random()*(100 - safePadding*2) + safePadding)+'%'; 
+            n.style.top = (Math.random()*(100 - safePadding*2) + safePadding)+'%';
+            n.onclick = (e) => { 
+                gameScore++; document.getElementById('score').innerText=gameScore; 
+                createGameParticles(e.clientX, e.clientY);
+                n.remove(); spawnNode(); 
+            };
+            area.appendChild(n);
+            gsap.from(n, {scale:0, duration:0.3, ease:"back.out"});
+        }
+        function gameWin() {
+            gameActive=false; clearInterval(gameInt);
+            document.getElementById('game-hud').style.opacity='0';
+            document.getElementById('game-win-screen').style.display='flex';
+        }
+        function createGameParticles(x, y) {
+            const area = document.getElementById('game-canvas-area');
+            const rect = area.getBoundingClientRect();
+            for(let i=0; i<10; i++) {
+                const p = document.createElement('div');
+                p.style.position='absolute'; p.style.width='3px'; p.style.height='3px'; p.style.background='white';
+                p.style.left = (x - rect.left)+'px'; p.style.top = (y - rect.top)+'px';
+                p.style.zIndex = '40';
+                area.appendChild(p);
+                gsap.to(p, { x: (Math.random()-0.5)*150, y: (Math.random()-0.5)*150, opacity: 0, duration: 0.6, onComplete: () => p.remove() });
+            }
+        }
+        window.onload = initLoader;
+    </script>
+</body>
+</html>
